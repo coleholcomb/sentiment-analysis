@@ -51,15 +51,21 @@ class NaiveBayes():
         pc[i,c] = np.exp(pc[i,c])
         prediction = np.argmax(pc, axis=-1)
         
-        correct, false = 0, 0
+        correct, false, fp, fn = 0, 0, 0, 0
         for i in range(ntest):
             if prediction[i] == labels[i]:
                 correct += 1
+            elif prediction[i] == 1:
+                fp += 1
+                false += 1
             else:
+                fn +=1
                 false +=1
 
-        print(correct/ntest)
-        print(false/ntest)
+        print('Percentage correct:         {}'.format(correct/ntest))
+        print('Percentage incorrect:       {}'.format(false/ntest))
+        print('Percentage false positives: {}'.format(fp/ntest))
+        print('Percentage false negatives: {}'.format(fn/ntest))
 
 #%%
 import pandas as pd
