@@ -1,7 +1,8 @@
 '''
-Notebook for implementing binary classification methods on product reviews.
+Classes for feature filtering and binary classification methods on product reviews.
 '''
 #%%
+import numpy as np
 from abc import ABCMeta, abstractmethod
 from operator import itemgetter
 
@@ -125,8 +126,12 @@ class MaxDisc(FeatureFilter):
             reduced versions of inputs
         '''
         super().__init__(features, labels)
-        self.kl01  = self.joint_prob[0]*np.log2(self.joint_prob[0]/self.joint_prob[1])
-        self.kl10  = self.joint_prob[1]*np.log2(self.joint_prob[1]/self.joint_prob[0])
+        self.kl01  = (self.joint_prob[0]/self.class_prob[0]) \
+                     *np.log2((self.joint_prob[0]/self.class_prob[0])
+                             /(self.joint_prob[1]/self.class_prob[1]))
+        self.kl10  = (self.joint_prob[1]/self.class_prob[1]) \
+                     *np.log2((self.joint_prob[1]/self.class_prob[1])
+                             /(self.joint_prob[0]/self.class_prob[0]))
         self.jd = self.kl01 + self.kl10
 
         self.vocab = sorted([(x,y,z) for x,y,z in zip(range(self.nfeatures), vocab, self.jd)], 
@@ -153,29 +158,8 @@ class MaxDisc(FeatureFilter):
                         f.write(',')
                     else:
                         f.write('\n')
-#%%
-vocab = open('out_vocab_1.txt', 'r', encoding='utf-8').read(-1).split('\n')
-#if '$' in vocab[0]:
-#    vocab[0] = '$'
-filt = MutualInformation(features, labels, vocab, 20)
-for i in range(20):
-    print(filt.vocab[i])
 
 
-#%%
-inds = np.array(filt.vocab).T[0].astype(int)
-inds[0]
-
-#%%
-filt.joint_prob[0]
-
-#%%
-import matplotlib.pyplot as plt
-
-plt.hist(filt.mi[0]+filt.mi[1], bins=200)
-
-#%%
-import numpy as np
 class NaiveBayes():
     '''
     Naive Bayes classifier for sentiment analysis on feature output from
@@ -205,10 +189,6 @@ class NaiveBayes():
                     self.likelihood[y,j] += 1 
         self.class_priors = self.class_priors/self.nexamples
         self.likelihood = self.likelihood/(self.nexamples + self.nfeatures)
-
-        print('N_features = {}'.format(self.nfeatures))
-        print('N_classes  = {}'.format(self.nclasses))
-        print('N_examples = {}'.format(self.nexamples))
     
     def test(self, features, labels):
         features = features.values
@@ -227,10 +207,15 @@ class NaiveBayes():
         pc[i,c] = np.exp(pc[i,c])
         prediction = np.argmax(pc, axis=-1)
         
-        correct, false, fp, fn = 0, 0, 0, 0
+        correct, false = 0, 0
+        tp, fp, tn, fn = 0, 0, 0, 0
         for i in range(ntest):
             if prediction[i] == labels[i]:
                 correct += 1
+                if labels[i] == 1:
+                    tp += 1
+                else:
+                    tn += 1
             elif prediction[i] == 1:
                 fp += 1
                 false += 1
@@ -238,255 +223,5 @@ class NaiveBayes():
                 fn +=1
                 false +=1
 
-        print('Percentage correct:         {}'.format(correct/ntest))
-        print('Percentage incorrect:       {}'.format(false/ntest))
-        print('Percentage false positives: {}'.format(fp/ntest))
-        print('Percentage false negatives: {}'.format(fn/ntest))
-
-#%%
-import pandas as pd
-import numpy as np
-
-jd_thresholds = [10,50,100,200,300,400,500,1621]
-mi_thresholds = [10,50,100,200,300,400,500,1621]
-thresholds = [1]
-
-for i in jd_thresholds:
-    print('jd: '+str(i))
-    testfeatures = pd.read_csv('jd_'+str(i)+'_test_bag_of_words_0.csv', sep=',', header=None)
-    testlabels = np.genfromtxt('jd_'+str(i)+'_test_classes_0.txt', delimiter='\n')
-
-    features=pd.read_csv('jd_'+str(i)+'_bag_of_words_1.csv', sep=',',header=None)
-    labels = np.genfromtxt('out_classes_1.txt', delimiter='\n')
-
-    nb = NaiveBayes()
-    nb.train(features,labels)
-    nb.test(testfeatures, testlabels)
-    print('\n')
-
-for i in mi_thresholds:
-    print('mi: '+str(i))
-    testfeatures = pd.read_csv('mi_'+str(i)+'_test_bag_of_words_0.csv', sep=',', header=None)
-    testlabels = np.genfromtxt('mi_'+str(i)+'_test_classes_0.txt', delimiter='\n')
-
-    features=pd.read_csv('mi_'+str(i)+'_bag_of_words_1.csv', sep=',',header=None)
-    labels = np.genfromtxt('out_classes_1.txt', delimiter='\n')
-
-    nb = NaiveBayes()
-    nb.train(features,labels)
-    nb.test(testfeatures, testlabels)
-    print('\n')
-
-for i in thresholds:
-    print('all: '+str(i))
-    testfeatures = pd.read_csv('test'+str(i)+'_bag_of_words_0.csv', sep=',', header=None)
-    testlabels = np.genfromtxt('test'+str(i)+'_classes_0.txt', delimiter='\n')
-
-    features=pd.read_csv('out_bag_of_words_'+str(i)+'.csv', sep=',',header=None)
-    labels = np.genfromtxt('out_classes_'+str(i)+'.txt', delimiter='\n')
-
-    nb = NaiveBayes()
-    nb.train(features,labels)
-    nb.test(testfeatures, testlabels)
-    print('\n')
-
-#%%
-from sklearn.svm import SVC, LinearSVC
-
-mi_thresholds = [10,50,100,200,300,400,500,1621]
-thresholds = [1]
-
-for i in mi_thresholds:
-    print('mi: '+str(i))
-    testfeatures = pd.read_csv('mi_'+str(i)+'_test_bag_of_words_0.csv', sep=',', header=None)
-    testlabels = np.genfromtxt('mi_'+str(i)+'_test_classes_0.txt', delimiter='\n')
-
-    features=pd.read_csv('mi_'+str(i)+'_bag_of_words_1.csv', sep=',',header=None)
-    labels = np.genfromtxt('out_classes_1.txt', delimiter='\n')
-
-    svc = SVC()
-    svc.fit(features, labels)
-
-    linsvc = LinearSVC()
-    linsvc.fit(features, labels) 
-    testpred = svc.predict(testfeatures)
-    ntest = testlabels.shape[0]
-    correct, false, fp, fn = 0, 0, 0, 0
-    for i in range(ntest):
-        if testpred[i] == testlabels[i]:
-            correct += 1
-        elif testpred[i] == 1:
-            fp += 1
-            false += 1
-        else:
-            fn +=1
-            false +=1
-
-    print('Percentage correct:         {}'.format(correct/ntest))
-    print('Percentage incorrect:       {}'.format(false/ntest))
-    print('Percentage false positives: {}'.format(fp/ntest))
-    print('Percentage false negatives: {}'.format(fn/ntest))
-
-    testpred = linsvc.predict(testfeatures)
-    ntest = testlabels.shape[0]
-    correct, false, fp, fn = 0, 0, 0, 0
-    for i in range(ntest):
-        if testpred[i] == testlabels[i]:
-            correct += 1
-        elif testpred[i] == 1:
-            fp += 1
-            false += 1
-        else:
-            fn +=1
-            false +=1
-
-    print('Percentage correct:         {}'.format(correct/ntest))
-    print('Percentage incorrect:       {}'.format(false/ntest))
-    print('Percentage false positives: {}'.format(fp/ntest))
-    print('Percentage false negatives: {}'.format(fn/ntest))
-
-    print('\n')
-
-for i in thresholds:
-    print('all: '+str(i))
-    testfeatures = pd.read_csv('test'+str(i)+'_bag_of_words_0.csv', sep=',', header=None)
-    testlabels = np.genfromtxt('test'+str(i)+'_classes_0.txt', delimiter='\n')
-
-    features=pd.read_csv('out_bag_of_words_'+str(i)+'.csv', sep=',',header=None)
-    labels = np.genfromtxt('out_classes_'+str(i)+'.txt', delimiter='\n')
-
-    svc = SVC()
-    svc.fit(features, labels)
-
-    linsvc = LinearSVC()
-    linsvc.fit(features, labels) 
-    testpred = svc.predict(testfeatures)
-    ntest = testlabels.shape[0]
-    correct, false, fp, fn = 0, 0, 0, 0
-    for i in range(ntest):
-        if testpred[i] == testlabels[i]:
-            correct += 1
-        elif testpred[i] == 1:
-            fp += 1
-            false += 1
-        else:
-            fn +=1
-            false +=1
-
-    print('Percentage correct:         {}'.format(correct/ntest))
-    print('Percentage incorrect:       {}'.format(false/ntest))
-    print('Percentage false positives: {}'.format(fp/ntest))
-    print('Percentage false negatives: {}'.format(fn/ntest))
-
-    testpred = linsvc.predict(testfeatures)
-    ntest = testlabels.shape[0]
-    correct, false, fp, fn = 0, 0, 0, 0
-    for i in range(ntest):
-        if testpred[i] == testlabels[i]:
-            correct += 1
-        elif testpred[i] == 1:
-            fp += 1
-            false += 1
-        else:
-            fn +=1
-            false +=1
-
-    print('Percentage correct:         {}'.format(correct/ntest))
-    print('Percentage incorrect:       {}'.format(false/ntest))
-    print('Percentage false positives: {}'.format(fp/ntest))
-    print('Percentage false negatives: {}'.format(fn/ntest))
-
-    print('\n')
-
-
-
-#%%
-testpred = svc.predict(testfeatures)
-ntest = testlabels.shape[0]
-correct, false, fp, fn = 0, 0, 0, 0
-for i in range(ntest):
-    if testpred[i] == testlabels[i]:
-        correct += 1
-    elif testpred[i] == 1:
-        fp += 1
-        false += 1
-    else:
-        fn +=1
-        false +=1
-
-print('Percentage correct:         {}'.format(correct/ntest))
-print('Percentage incorrect:       {}'.format(false/ntest))
-print('Percentage false positives: {}'.format(fp/ntest))
-print('Percentage false negatives: {}'.format(fn/ntest))
-
-testpred = linsvc.predict(testfeatures)
-ntest = testlabels.shape[0]
-correct, false, fp, fn = 0, 0, 0, 0
-for i in range(ntest):
-    if testpred[i] == testlabels[i]:
-        correct += 1
-    elif testpred[i] == 1:
-        fp += 1
-        false += 1
-    else:
-        fn +=1
-        false +=1
-
-print('Percentage correct:         {}'.format(correct/ntest))
-print('Percentage incorrect:       {}'.format(false/ntest))
-print('Percentage false positives: {}'.format(fp/ntest))
-print('Percentage false negatives: {}'.format(fn/ntest))
-
-#%%
-from sklearn.tree import DecisionTreeClassifier
-
-dtgini = DecisionTreeClassifier()
-dtgini.fit(features, labels)
-
-dtentropy = DecisionTreeClassifier(criterion='entropy')
-dtentropy.fit(features, labels) 
-
-#%%
-testpred = dtgini.predict(testfeatures)
-ntest = testlabels.shape[0]
-correct, false, fp, fn = 0, 0, 0, 0
-for i in range(ntest):
-    if testpred[i] == testlabels[i]:
-        correct += 1
-    elif testpred[i] == 1:
-        fp += 1
-        false += 1
-    else:
-        fn +=1
-        false +=1
-
-print('Percentage correct:         {}'.format(correct/ntest))
-print('Percentage incorrect:       {}'.format(false/ntest))
-print('Percentage false positives: {}'.format(fp/ntest))
-print('Percentage false negatives: {}'.format(fn/ntest))
-
-testpred = dtentropy.predict(testfeatures)
-ntest = testlabels.shape[0]
-correct, false, fp, fn = 0, 0, 0, 0
-for i in range(ntest):
-    if testpred[i] == testlabels[i]:
-        correct += 1
-    elif testpred[i] == 1:
-        fp += 1
-        false += 1
-    else:
-        fn +=1
-        false +=1
-
-print('Percentage correct:         {}'.format(correct/ntest))
-print('Percentage incorrect:       {}'.format(false/ntest))
-print('Percentage false positives: {}'.format(fp/ntest))
-print('Percentage false negatives: {}'.format(fn/ntest))
-
-#%%
-from sklearn.feature_selection import mutual_info_classif
-
-mi = mutual_info_classif(features, labels)
-print(mi)
-#%%
-mi.shape
+        return (correct/ntest, tp/(tp + fp), tp/(tp + fn), tn/(tn + fp))
+        

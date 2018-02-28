@@ -117,15 +117,17 @@ def main(argv):
   path = '.'
   outputf = 'out'
   vocabf = ''
+  dataf = 'train.txt'
+  thresh = '1'
 
   try:
-   opts, args = getopt.getopt(argv,"p:o:v:",["path=","ofile=","vocabfile="])
+   opts, args = getopt.getopt(argv,"p:o:v:d:t",["path=","ofile=","vocabfile=","datafile=","threshold="])
   except getopt.GetoptError:
-    print('Usage: \n python preprocessSentences.py -p <path> -o <outputfile> -v <vocabulary>')
+    print('Usage: \n python preprocessSentences.py -p <path> -o <outputfile> -v <vocabulary> -d <datafile> -t <threshold>')
     sys.exit(2)
   for opt, arg in opts:
     if opt == '-h':
-      print ('Usage: \n python preprocessSentences.py -p <path> -o <outputfile> -v <vocabulary>')
+      print ('Usage: \n python preprocessSentences.py -p <path> -o <outputfile> -v <vocabulary> -d <datafile> -t <threshold>')
       sys.exit()
     elif opt in ("-p", "--path"):
       path = arg
@@ -133,14 +135,18 @@ def main(argv):
       outputf = arg
     elif opt in ("-v", "--vocabfile"):
       vocabf = arg
+    elif opt in ("-d", "--datafile"):
+        dataf = arg
+    elif opt in ("-t", "--threshold"):
+        thresh = arg
 
-  traintxt = path+"/test.txt"
+  traintxt = path+"/"+dataf
   print('Path: ' + path)
   print('Training data:' + traintxt)
 
   # Tokenize training data (if training vocab doesn't already exist):
   if (not vocabf):
-    word_count_threshold = 5
+    word_count_threshold = int(thresh)
     (docs, classes, samples, words) = tokenize_corpus(traintxt, train=True)
     vocab = wordcount_filter(words, num=word_count_threshold)
     # Write new vocab file
@@ -165,7 +171,6 @@ def main(argv):
   # Write bow file
   with open(path+"/"+outputf+"_bag_of_words_"+str(word_count_threshold)+".csv", "w") as f:
     writer = csv.writer(f)
-    print(bow)
     writer.writerows(bow)
 
   # Write classes
